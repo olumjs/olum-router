@@ -1,6 +1,6 @@
 /**
  * @name router.js
- * @version 0.1.0
+ * @version 0.1.1
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -14,7 +14,7 @@
   /* helpers */
   var global = typeof self !== "undefined" ? self : this;
   var debugStr = "OlumRouter [warn]:";
-  var isDebugging = true;
+  var isDebugging = false;
 
   function isDef(val) {
     return (val !== undefined && val !== null);
