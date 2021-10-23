@@ -1,0 +1,39 @@
+{
+  "name": "olum-router",
+  "version": "0.1.0",
+  "description": "A router of olumjs library",
+  "main": "dist/router.js",
+  "directories": {
+    "dist": "dist"
+  },
+  "scripts": {
+    "build": "gulp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/olumjs/olum-router.git"
+  },
+  "keywords": [
+    "npm",
+    "olum",
+    "router",
+    "olumjs",
+    "vanilla",
+    "spa"
+  ],
+  "author": "Eissa Saber",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/olumjs/olum-router/issues"
+  },
+  "homepage": "https://github.com/olumjs/olum-router#readme",
+  "devDependencies": {
+    "@babel/core": "^7.14.6",
+    "@babel/preset-env": "^7.14.7",
+    "gulp": "^4.0.2",
+    "gulp-babel": "^8.0.0",
+    "gulp-concat": "^2.6.1",
+    "gulp-header": "^2.0.9",
+    "gulp-uglify": "^3.0.2"
+  }
+}
