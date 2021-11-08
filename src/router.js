@@ -1,6 +1,6 @@
 /**
  * @name router.js
- * @version 0.1.1
+ * @version 0.1.2
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -212,7 +212,7 @@
         throw new Error(debugStr + " Missing View argument @OlumRouter");
       } else {
         var view = new View();
-        var entry = view.data();
+        var entry = view.olumCompData();
         var compsArr = $this.buildTree(entry);
         // labeling components
         var label = isDev() ? $this.labelView(entry, compsArr) : { entry: entry, compsArr: compsArr };
