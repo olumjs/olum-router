@@ -1,6 +1,6 @@
 /**
  * @name router.js
- * @version 0.1.2
+ * @version 0.1.3
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -127,12 +127,15 @@
 
         var route;
         for(var i = 0; i < routes.length; i++) {
-          if (routes[i].path === current) {
-            route = routes[i];
+          var item = routes[i];
+          if (current === item.path) {
+            route = item;
             break;
-          } else if (current === "" || current === "/" || current.includes("index.html")) {
-            route = routes[i].path === _root;
-            break;
+          } else if (current === "" || current === "/" || current.indexOf("index.html") !== -1) {
+            if (item.path === _root) {
+              route = item;
+              break;
+            }
           }
         }
 
