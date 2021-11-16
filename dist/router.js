@@ -1,6 +1,6 @@
 /**
  * @name router.js
- * @version 0.1.3
+ * @version 0.2.3
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -75,6 +75,7 @@
     
     // public
     this.isReady = false;
+    this.params = {};
     this.name = function () {
       return "OlumRouter";
     }
@@ -125,6 +126,31 @@
         // todo enhance this part 
         current = (mode === "hash" && root !== "/") ? (current = _root + current).replace(/\/$/, "") : current;
 
+        // start support router params
+        for(var x = 0; x < routes.length; x++) {
+          var obj = routes[x];
+          if (obj.path.indexOf(":") !== -1) {
+            debug(["has param -> ", obj]);
+            var routeArr = obj.path.split(":");
+            var paramKey = routeArr[routeArr.length-1];
+            $this.params[paramKey] = null;
+            routeArr.pop();
+            var cleanRoute = routeArr.join("");
+            debug({paramKey});
+            debug({cleanRoute});
+            if (current.indexOf(cleanRoute) !== -1) {
+              debug(["this.listen current1, -> ", current]);
+              var paramVal = current.replace(cleanRoute, "");
+              $this.params[paramKey] = paramVal;
+              var regex = new RegExp("(\\/"+paramVal+")");
+              current = current.replace(regex, "/:"+paramKey);
+              debug(["this.listen current2, -> ", current]);
+            }
+          }
+        }
+        debug(["$this.params -> ", $this.params]);
+        // end support router params
+        
         var route;
         for(var i = 0; i < routes.length; i++) {
           var item = routes[i];
