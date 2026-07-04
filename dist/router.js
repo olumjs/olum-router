@@ -1,6 +1,6 @@
 /**
  * @name router.js
- * @version 0.3.0
+ * @version 0.3.1
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -54,6 +54,55 @@ export default (function () {
     level = level == "err" ? "error" : level;
     if (isDebugging) Array.isArray(args) ? console[level].apply(console, args) : console[level](args);
   }
+
+  /**
+   * Extract route params from a file path and pathname. -- router file based
+   *
+   * @param {string} filePath
+   * @param {string} pathname
+   * @returns {Record<string, string | string[]>}
+   *
+   * Examples:
+   * extractParams("/blog/[slug]/page.html", "/blog/hello")
+   * -> { slug: "hello" }
+   *
+   * extractParams("/users/[id]/posts/[postId]/page.html", "/users/5/posts/10")
+   * -> { id: "5", postId: "10" }
+   */
+  function extractParams(filePath, pathname) {
+    const routeParts = filePath
+      .replace(/\/page\.[^/]+$/, "")
+      .split("/")
+      .filter(Boolean);
+
+    const pathParts = pathname.split("/").filter(Boolean);
+
+    const params = {};
+
+    let i = routeParts.length - 1;
+    let j = pathParts.length - 1;
+
+    while (i >= 0 && j >= 0) {
+      const part = routeParts[i];
+
+      // [...slug]
+      if (part.startsWith("[...") && part.endsWith("]")) {
+        params[part.slice(4, -1)] = pathParts.slice(0, j + 1);
+        break;
+      }
+
+      // [slug]
+      if (part.startsWith("[") && part.endsWith("]")) {
+        params[part.slice(1, -1)] = decodeURIComponent(pathParts[j]);
+      }
+
+      i--;
+      j--;
+    }
+
+    return params;
+  }
+  global.extractParams = extractParams;
 
   function Router(config) {
     if (!(this instanceof Router)) throw new Error("can't invoke 'Router' without 'new' keyword");
