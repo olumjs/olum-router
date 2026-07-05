@@ -1,6 +1,6 @@
 /**
  * @name router.js
- * @version 0.3.1
+ * @version 0.3.2
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -174,7 +174,6 @@ export default (function () {
 
         // todo enhance this part
         current = mode === "hash" && root !== "/" ? (current = _root + current).replace(/\/$/, "") : current;
-        console.log({current});
 
         // start support router params
         for (var x = 0; x < routes.length; x++) {
