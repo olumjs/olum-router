@@ -1,11 +1,10 @@
 /**
- * @name router.js
- * @version 0.3.2
- * @copyright 2021
- * @author Eissa Saber
- * @license MIT
- */
-
+* @name olum-router
+* @version 0.5.0
+* @copyright 2026 
+* @author Eissa Saber
+* @license MIT
+*/
 export default (function () {
   "use strict";
   /* helpers */
@@ -55,55 +54,6 @@ export default (function () {
     if (isDebugging) Array.isArray(args) ? console[level].apply(console, args) : console[level](args);
   }
 
-  /**
-   * Extract route params from a file path and pathname. -- router file based
-   *
-   * @param {string} filePath
-   * @param {string} pathname
-   * @returns {Record<string, string | string[]>}
-   *
-   * Examples:
-   * extractParams("/blog/[slug]/page.html", "/blog/hello")
-   * -> { slug: "hello" }
-   *
-   * extractParams("/users/[id]/posts/[postId]/page.html", "/users/5/posts/10")
-   * -> { id: "5", postId: "10" }
-   */
-  function extractParams(filePath, pathname) {
-    const routeParts = filePath
-      .replace(/\/page\.[^/]+$/, "")
-      .split("/")
-      .filter(Boolean);
-
-    const pathParts = pathname.split("/").filter(Boolean);
-
-    const params = {};
-
-    let i = routeParts.length - 1;
-    let j = pathParts.length - 1;
-
-    while (i >= 0 && j >= 0) {
-      const part = routeParts[i];
-
-      // [...slug]
-      if (part.startsWith("[...") && part.endsWith("]")) {
-        params[part.slice(4, -1)] = pathParts.slice(0, j + 1);
-        break;
-      }
-
-      // [slug]
-      if (part.startsWith("[") && part.endsWith("]")) {
-        params[part.slice(1, -1)] = decodeURIComponent(pathParts[j]);
-      }
-
-      i--;
-      j--;
-    }
-
-    return params;
-  }
-  global.extractParams = extractParams;
-
   function Router(config) {
     if (!(this instanceof Router)) throw new Error("can't invoke 'Router' without 'new' keyword");
     if (!config) throw new Error(debugStr + " Missing config object @Router");
@@ -136,7 +86,7 @@ export default (function () {
       isFrozen = false;
     };
 
-    this.getRoute = function () {
+    this.pathname = function () {
       var fragment = "";
       if (mode === "history") fragment = clear(decodeURIComponent(location.pathname));
       else if (mode === "hash") fragment = clear(decodeURIComponent(location.hash));
@@ -151,56 +101,52 @@ export default (function () {
         debug("Pushed to history");
         dispatchEvent(popStateEvent);
       } else if (mode === "hash") {
-        // todo enhance this part
-        if (root === "/") {
-          location.href = location.href.replace(/\#.*/g, "") + "#" + path;
-        } else {
-          var _root = clear(root);
-          _root = _root.replace(/\//g, "\\/");
-          var rootRegex = new RegExp("\\/" + _root, "g");
-          var _path = path.replace(rootRegex, "");
-          _path = "/" + _path.replace(/^\//g, "");
-          location.href = location.href.replace(/\#.*/g, "") + "#" + _path;
-        }
+        location.href = hashHref(path);
       }
+    };
+
+    this.push = function (path) {
+      $this.navigate(path);
+    };
+
+    this.replace = function (path) {
+      $this.unfreeze();
+      path = resolve(path);
+      if (mode === "history") {
+        global.history.replaceState({}, "", path);
+        debug("Replaced history entry");
+        dispatchEvent(popStateEvent);
+      } else if (mode === "hash") {
+        location.replace(hashHref(path));
+      }
+    };
+
+    this.back = function () {
+      global.history.back();
+    };
+
+    this.forward = function () {
+      global.history.forward();
+    };
+
+    this.go = function (n) {
+      global.history.go(n);
     };
 
     this.listen = function () {
       debug($this.__proto__);
       global.addEventListener("popstate", function () {
         debug(["Dispatched Popstate", routes]);
-        var current = $this.getRoute();
+        var current = $this.pathname();
         var _root = "/" + clear(root);
 
         // todo enhance this part
         current = mode === "hash" && root !== "/" ? (current = _root + current).replace(/\/$/, "") : current;
 
-        // start support router params
-        for (var x = 0; x < routes.length; x++) {
-          var obj = routes[x];
-          if (obj.path.indexOf(":") !== -1) {
-            debug(["has param -> ", obj]);
-            var routeArr = obj.path.split(":");
-            var paramKey = routeArr[routeArr.length - 1];
-            $this.params[paramKey] = null;
-            routeArr.pop();
-            var cleanRoute = routeArr.join("");
-            debug({ paramKey });
-            debug({ cleanRoute });
-            if (current.indexOf(cleanRoute) !== -1) {
-              debug(["this.listen current1, -> ", current]);
-              var paramVal = current.replace(cleanRoute, "");
-              $this.params[paramKey] = paramVal;
-              var regex = new RegExp("(\\/" + paramVal + ")");
-              current = current.replace(regex, "/:" + paramKey);
-              debug(["this.listen current2, -> ", current]);
-            }
-          }
-        }
-        debug(["$this.params -> ", $this.params]);
-        // end support router params
-
         var route;
+        $this.params = {};
+
+        // pass 1: static routes (exact match) - always win over dynamic ones
         for (var i = 0; i < routes.length; i++) {
           var item = routes[i];
           if (current === item.path) {
@@ -213,6 +159,20 @@ export default (function () {
             }
           }
         }
+
+        // pass 2: dynamic routes e.g. /match/:slug/:id vs /match/liverpool/123
+        if (!isDef(route)) {
+          for (var x = 0; x < routes.length; x++) {
+            if (routes[x].path.indexOf(":") === -1) continue;
+            var params = matchRoute(routes[x].path, current);
+            if (isDef(params)) {
+              $this.params = params;
+              route = routes[x];
+              break;
+            }
+          }
+        }
+        debug(["$this.params -> ", $this.params]);
 
         if (isDef(route)) {
           if (!isFrozen) route.cb(); // invokes mount(view)
@@ -248,11 +208,39 @@ export default (function () {
       return str;
     }
 
+    // "/match/:slug/:id" vs "/match/liverpool/123" -> { slug: "liverpool", id: "123" } | null if no match
+    function matchRoute(routePath, pathname) {
+      var routeSegs = routePath.split("/").filter(Boolean);
+      var pathSegs = pathname.split("/").filter(Boolean);
+      if (routeSegs.length !== pathSegs.length) return null;
+      var params = {};
+      for (var i = 0; i < routeSegs.length; i++) {
+        if (routeSegs[i].charAt(0) === ":") {
+          params[routeSegs[i].slice(1)] = pathSegs[i];
+        } else if (routeSegs[i] !== pathSegs[i]) {
+          return null;
+        }
+      }
+      return params;
+    }
+
     function resolve(path) {
       var _root = clear(root);
       path = clear(path);
       path = root !== "/" ? "/" + _root + "/" + path : "/" + path;
       return path !== "/" ? path.replace(/\/$/g, "") : path;
+    }
+
+    function hashHref(path) {
+      // todo enhance this part
+      var base = location.href.replace(/\#.*/g, "");
+      if (root === "/") return base + "#" + path;
+      var _root = clear(root);
+      _root = _root.replace(/\//g, "\\/");
+      var rootRegex = new RegExp("\\/" + _root, "g");
+      var _path = path.replace(rootRegex, "");
+      _path = "/" + _path.replace(/^\//g, "");
+      return base + "#" + _path;
     }
 
     function to() {
@@ -265,7 +253,7 @@ export default (function () {
           links[i].addEventListener("click", function (e) {
             var path = e.target.getAttribute("to");
             var _path_ = resolve(path);
-            var current = $this.getRoute();
+            var current = $this.pathname();
             if (_path_ === current) return; // stop routing | preserve history from duplicated routes
             $this.navigate(path); // navigate to clicked route
           });
@@ -290,7 +278,7 @@ export default (function () {
       } else {
         $this.render(View);
         setTimeout(() => {
-          active($this.getRoute()); // add active class to current route link tag
+          active($this.pathname()); // add active class to current route link tag
           to(); // enables to attribute e.g. <a to="/">Home</a>
           if (isDef(viewLoaded)) {
             dispatchEvent(viewLoaded);
@@ -325,6 +313,54 @@ export default (function () {
       popStateEvent = new PopStateEvent("popstate");
       viewLoaded = new CustomEvent("viewLoaded", { detail: {}, bubbles: true, cancelable: true, composed: false });
       this.isReady = true;
+    }
+
+    /**
+     * Extract route params from a file path and pathname. -- router file based
+     *
+     * @param {string} filePath
+     * @param {string} pathname
+     * @returns {Record<string, string | string[]>}
+     *
+     * Examples:
+     * extractParams("/blog/[slug]/page.html", "/blog/hello")
+     * -> { slug: "hello" }
+     *
+     * extractParams("/users/[id]/posts/[postId]/page.html", "/users/5/posts/10")
+     * -> { id: "5", postId: "10" }
+     */
+    this.extractParams = function (filePath, pathname) {
+      const routeParts = filePath
+        .replace(/\/page\.[^/]+$/, "")
+        .split("/")
+        .filter(Boolean);
+  
+      const pathParts = pathname.split("/").filter(Boolean);
+  
+      const params = {};
+  
+      let i = routeParts.length - 1;
+      let j = pathParts.length - 1;
+  
+      while (i >= 0 && j >= 0) {
+        const part = routeParts[i];
+  
+        // [...slug]
+        if (part.startsWith("[...") && part.endsWith("]")) {
+          params[part.slice(4, -1)] = pathParts.slice(0, j + 1);
+          break;
+        }
+  
+        // [slug]
+        if (part.startsWith("[") && part.endsWith("]")) {
+          params[part.slice(1, -1)] = decodeURIComponent(pathParts[j]);
+        }
+  
+        i--;
+        j--;
+      }
+  
+      return params;
     }
   }
 

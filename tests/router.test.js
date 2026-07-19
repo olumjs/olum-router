@@ -36,12 +36,15 @@ const FAIL_ICON = red("✖");
 // ── Loader ────────────────────────────────────────────────────────────────────
 // Evaluate router.js inside a fresh jsdom window. `url` seeds location so a test
 // can start "already on" a given route. Returns the window plus the Router ctor
-// and the extractParams helper the module installs on `window`.
+// and an extractParams helper (an instance method on Router, so it's reached
+// through a throwaway instance).
 const ROUTER_SRC = fs.readFileSync(path.join(__dirname, "../src/router.js"), "utf8");
 function load(url) {
   const dom = new JSDOM("<!doctype html><body></body>", { url: url || "http://localhost/", runScripts: "outside-only" });
   dom.window.eval(ROUTER_SRC.replace(/^\s*export\s+default\s+/m, "window.__Router = "));
-  return { window: dom.window, document: dom.window.document, Router: dom.window.__Router, extractParams: dom.window.extractParams };
+  const Router = dom.window.__Router;
+  const extractParams = (fp, pn) => new Router({ routes: [{ path: "/", comp: () => {} }] }).extractParams(fp, pn);
+  return { window: dom.window, document: dom.window.document, Router: Router, extractParams: extractParams };
 }
 
 // router.js has a stray `console.log({current})` inside its popstate handler (and
@@ -148,9 +151,10 @@ check("[...rest] catch-all returns an array (current behavior: from path start)"
   return Array.isArray(p.path) && p.path.join("/") === "docs/a/b/c";
 });
 
-check("extractParams is installed on window", () => {
-  const { window } = load();
-  return typeof window.extractParams === "function";
+check("extractParams is exposed on the router instance", () => {
+  const { Router } = load();
+  const r = new Router({ routes: [{ path: "/", comp: () => {} }] });
+  return typeof r.extractParams === "function";
 });
 
 // ── §2 String.prototype.cap ───────────────────────────────────────────────────
@@ -222,22 +226,22 @@ check("params starts as an empty object", () => {
   return r.params && typeof r.params === "object" && Object.keys(r.params).length === 0;
 });
 
-// ── §4 getRoute() normalization ───────────────────────────────────────────────
-section("§4 getRoute()");
+// ── §4 pathname() normalization ───────────────────────────────────────────────
+section("§4 pathname()");
 
 check("hash mode reads the fragment from location.hash", () => {
   const { router } = makeRouter({ routes: [{ path: "/foo", comp: view("F") }] }, "http://localhost/#/foo");
-  return router.getRoute() === "/foo";
+  return router.pathname() === "/foo";
 });
 
 check("a trailing slash is normalized away", () => {
   const { router } = makeRouter({ routes: [{ path: "/foo", comp: view("F") }] }, "http://localhost/#/foo/");
-  return router.getRoute() === "/foo";
+  return router.pathname() === "/foo";
 });
 
 check("history mode reads the fragment from location.pathname", () => {
   const { router } = makeRouter({ mode: "history", routes: [{ path: "/foo", comp: view("F") }] }, "http://localhost/foo");
-  return router.getRoute() === "/foo";
+  return router.pathname() === "/foo";
 });
 
 // ── §5 navigation ─────────────────────────────────────────────────────────────
@@ -246,7 +250,7 @@ section("§5 navigation");
 check("hash navigate() updates location.hash", () => {
   const { router, window } = makeRouter({ routes: [{ path: "/", comp: view("H") }, { path: "/about", comp: view("A") }] });
   silent(() => router.navigate("/about"));
-  return window.location.hash === "#/about" && router.getRoute() === "/about";
+  return window.location.hash === "#/about" && router.pathname() === "/about";
 });
 
 check("history navigate() pushes to the history stack", () => {
@@ -254,7 +258,38 @@ check("history navigate() pushes to the history stack", () => {
     { mode: "history", routes: [{ path: "/", comp: view("H") }, { path: "/about", comp: view("A") }] }
   );
   silent(() => router.navigate("/about"));
-  return window.location.pathname === "/about" && router.getRoute() === "/about";
+  return window.location.pathname === "/about" && router.pathname() === "/about";
+});
+
+check("push() navigates like navigate()", () => {
+  const { router, window } = makeRouter({ routes: [{ path: "/", comp: view("H") }, { path: "/about", comp: view("A") }] });
+  silent(() => router.push("/about"));
+  return window.location.hash === "#/about" && router.pathname() === "/about";
+});
+
+check("replace() overwrites the current entry instead of adding one", () => {
+  const { router, window } = makeRouter(
+    { mode: "history", routes: [{ path: "/", comp: view("H") }, { path: "/about", comp: view("A") }] }
+  );
+  const before = window.history.length;
+  silent(() => router.replace("/about"));
+  return window.location.pathname === "/about" && window.history.length === before;
+});
+
+check("back()/forward()/go() delegate to window.history", () => {
+  // jsdom's history traversal is async, so assert delegation rather than URL
+  // motion: swap window.history methods for spies and confirm each is hit.
+  const { router, window } = makeRouter({ routes: [{ path: "/", comp: view("H") }] });
+  window.eval(`
+    window.__hits = [];
+    history.back = () => window.__hits.push("back");
+    history.forward = () => window.__hits.push("forward");
+    history.go = (n) => window.__hits.push("go:" + n);
+  `);
+  router.back();
+  router.forward();
+  router.go(-2);
+  return window.__hits.join(",") === "back,forward,go:-2";
 });
 
 // ── §6 freeze / unfreeze ──────────────────────────────────────────────────────
@@ -336,7 +371,7 @@ if (failed) {
 }
 
 // Guard against a whole section silently disappearing. Bump when you add/remove tests.
-const EXPECTED_CHECKS = 25;
+const EXPECTED_CHECKS = 28;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");

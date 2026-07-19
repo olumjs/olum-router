@@ -18,3 +18,11 @@ Mark an anchor with the `to` attribute and the router handles the click as a cli
 :::warn
 Because routes are resolved on the client, the server must fall back to `index.html` for unknown paths — otherwise a hard refresh on a deep route like `/blog/hello` 404s before the app can match it.
 :::
+
+To navigate from code instead of a link — after a form submit or a login redirect — use the `push` / `replace` / `back` helpers from [Programmatic Navigation](/docs/programmatic-navigation).
+
+:::warn
+Keep the content of a `to` anchor **plain text**. The click handler reads the `to` attribute from the exact element that was clicked — a nested element (`<span>`, `<img>`, an icon) intercepts the click and the navigation misses.
+:::
+
+Clicking the link for the route you're already on is a **no-op** — the router skips it so history stays clean.

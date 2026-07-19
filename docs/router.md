@@ -55,3 +55,56 @@ Some folder names change how (or whether) routes are generated:
 :::tip
 Only the `NN-` prefix is stripped — digits elsewhere in a segment are kept as-is, so a folder like `7guis/` still serves `/7guis`.
 :::
+
+## Opting out — your own `main.js`
+
+You don't need to write an entry point at all: **omit `src/main.js` and the file-based router
+above is set up for you out of the box** — the route table is compiled into an auto-generated
+`src/main.js`. If you create `src/main.js` yourself, the compiler **skips** that generation
+entirely and uses your file as the entry point — useful when you don't need routing and want
+to drop `olum-router`.
+
+Your `main.js` must then mount the app itself. If a single route is all you need, this is the
+whole setup — and you can remove `olum-router` from `package.json` entirely:
+
+```js title="src/main.js"
+import Olum from "olum";
+import page from "./page.js";
+
+new Olum().$("#app").use(page);
+```
+
+If you instead want to configure the router **yourself** (your own route table instead of the
+generated one), the full setup looks like this — the same shape the auto-generated `main.js`
+has. As written it still mounts a single component; uncomment the three router lines (and
+remove the last line) to route manually:
+
+```js title="src/main.js"
+import Olum from "olum";
+// import Router from "olum-router";
+
+import Home from "./page.js";
+import About from "./about/page.js";
+
+export const routes = [
+  { path: "/", comp: Home },
+  { path: "/about", comp: About }
+];
+
+// const config = { mode: "history", root: "/", routes: routes };
+// const router = new Router(config);
+// new Olum().$("#app").use(router);
+new Olum().$("#app").use(Home);
+```
+
+If you also have a `not-found.html`, give it a route (`{ path: "/404", comp: NotFound }`) and
+add `err: "/404"` to the config — see [History Mode & the 404 Page](/docs/history-mode-and-404).
+
+:::note
+Components are authored as `.html` files but compiled to `.js` modules, so your imports
+reference the compiled name — `src/page.html` is imported as `./page.js`.
+:::
+
+:::note
+After each route's view mounts, the router dispatches a `viewLoaded` event on `window` — handy for analytics or scroll restoration: `window.addEventListener("viewLoaded", () => scrollTo(0, 0))`.
+:::
