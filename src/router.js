@@ -1,6 +1,6 @@
 export default (function () {
   "use strict";
-  /* helpers */
+
   var global = window;
   var debugStr = "Router [warn]:";
   var isDebugging = false;
@@ -22,7 +22,11 @@ export default (function () {
   }
 
   function isFullObj(obj) {
-    return !!(isObj(obj) && Array.isArray(Object.keys(obj)) && Object.keys(obj).length);
+    return !!(
+      isObj(obj) &&
+      Array.isArray(Object.keys(obj)) &&
+      Object.keys(obj).length
+    );
   }
 
   function addProp(obj, key, val) {
@@ -44,16 +48,19 @@ export default (function () {
   function debug(args, level) {
     if (!isDef(level)) level = "log";
     level = level == "err" ? "error" : level;
-    if (isDebugging) Array.isArray(args) ? console[level].apply(console, args) : console[level](args);
+    if (isDebugging)
+      Array.isArray(args)
+        ? console[level].apply(console, args)
+        : console[level](args);
   }
 
   function Router(config) {
-    if (!(this instanceof Router)) throw new Error("can't invoke 'Router' without 'new' keyword");
+    if (!(this instanceof Router))
+      throw new Error("can't invoke 'Router' without 'new' keyword");
     if (!config) throw new Error(debugStr + " Missing config object @Router");
     var $this = this;
     var pushStateAPI = global.history.pushState;
 
-    // set defaults
     var routes = [];
     var root = "/";
     var mode = "hash";
@@ -61,11 +68,11 @@ export default (function () {
     var isFrozen = false;
     var popStateEvent = null;
     var viewLoaded = null;
-    mode = config && config.mode === "history" && pushStateAPI ? "history" : "hash";
+    mode =
+      config && config.mode === "history" && pushStateAPI ? "history" : "hash";
     root = config && config.root ? config.root : "/";
     err = config && config.err ? resolve(config.err) : null;
 
-    // public
     this.isReady = false;
     this.params = {};
     this.name = function () {
@@ -81,8 +88,10 @@ export default (function () {
 
     this.pathname = function () {
       var fragment = "";
-      if (mode === "history") fragment = clear(decodeURIComponent(location.pathname));
-      else if (mode === "hash") fragment = clear(decodeURIComponent(location.hash));
+      if (mode === "history")
+        fragment = clear(decodeURIComponent(location.pathname));
+      else if (mode === "hash")
+        fragment = clear(decodeURIComponent(location.hash));
       return "/" + fragment;
     };
 
@@ -133,19 +142,24 @@ export default (function () {
         var current = $this.pathname();
         var _root = "/" + clear(root);
 
-        // todo enhance this part
-        current = mode === "hash" && root !== "/" ? (current = _root + current).replace(/\/$/, "") : current;
+        current =
+          mode === "hash" && root !== "/"
+            ? (current = _root + current).replace(/\/$/, "")
+            : current;
 
         var route;
         $this.params = {};
 
-        // pass 1: static routes (exact match) - always win over dynamic ones
         for (var i = 0; i < routes.length; i++) {
           var item = routes[i];
           if (current === item.path) {
             route = item;
             break;
-          } else if (current === "" || current === "/" || current.indexOf("index.html") !== -1) {
+          } else if (
+            current === "" ||
+            current === "/" ||
+            current.indexOf("index.html") !== -1
+          ) {
             if (item.path === _root) {
               route = item;
               break;
@@ -153,7 +167,6 @@ export default (function () {
           }
         }
 
-        // pass 2: dynamic routes e.g. /match/:slug/:id vs /match/liverpool/123
         if (!isDef(route)) {
           for (var x = 0; x < routes.length; x++) {
             if (routes[x].path.indexOf(":") === -1) continue;
@@ -168,7 +181,7 @@ export default (function () {
         debug(["$this.params -> ", $this.params]);
 
         if (isDef(route)) {
-          if (!isFrozen) route.cb(); // invokes mount(view)
+          if (!isFrozen) route.cb();
         } else {
           if (isDef(err)) {
             var _err;
@@ -194,14 +207,12 @@ export default (function () {
       dispatchEvent(popStateEvent);
     };
 
-    // private
     function clear(str) {
       var regex = new RegExp("^[#/]{1,}|/$", "g");
       str = String(str).toLowerCase().trim().replace(regex, "");
       return str;
     }
 
-    // "/match/:slug/:id" vs "/match/liverpool/123" -> { slug: "liverpool", id: "123" } | null if no match
     function matchRoute(routePath, pathname) {
       var routeSegs = routePath.split("/").filter(Boolean);
       var pathSegs = pathname.split("/").filter(Boolean);
@@ -225,7 +236,6 @@ export default (function () {
     }
 
     function hashHref(path) {
-      // todo enhance this part
       var base = location.href.replace(/\#.*/g, "");
       if (root === "/") return base + "#" + path;
       var _root = clear(root);
@@ -240,15 +250,15 @@ export default (function () {
       var links = [].slice.call(document.querySelectorAll("[to]"));
       if (isFullArr(links)) {
         for (var i = 0; i < links.length; i++) {
-          // disable href in anchor
-          if (links[i].nodeName === "A") links[i].setAttribute("href", "javascript:void(0)");
-          // onclick
+          if (links[i].nodeName === "A")
+            links[i].setAttribute("href", "javascript:void(0)");
+
           links[i].addEventListener("click", function (e) {
             var path = e.target.getAttribute("to");
             var _path_ = resolve(path);
             var current = $this.pathname();
-            if (_path_ === current) return; // stop routing | preserve history from duplicated routes
-            $this.navigate(path); // navigate to clicked route
+            if (_path_ === current) return;
+            $this.navigate(path);
           });
         }
       }
@@ -271,8 +281,8 @@ export default (function () {
       } else {
         $this.render(View);
         setTimeout(() => {
-          active($this.pathname()); // add active class to current route link tag
-          to(); // enables to attribute e.g. <a to="/">Home</a>
+          active($this.pathname());
+          to();
           if (isDef(viewLoaded)) {
             dispatchEvent(viewLoaded);
             debug("viewLoaded");
@@ -304,57 +314,46 @@ export default (function () {
       throw new Error(debugStr + " No routes found!");
     } else {
       popStateEvent = new PopStateEvent("popstate");
-      viewLoaded = new CustomEvent("viewLoaded", { detail: {}, bubbles: true, cancelable: true, composed: false });
+      viewLoaded = new CustomEvent("viewLoaded", {
+        detail: {},
+        bubbles: true,
+        cancelable: true,
+        composed: false,
+      });
       this.isReady = true;
     }
 
-    /**
-     * Extract route params from a file path and pathname. -- router file based
-     *
-     * @param {string} filePath
-     * @param {string} pathname
-     * @returns {Record<string, string | string[]>}
-     *
-     * Examples:
-     * extractParams("/blog/[slug]/page.html", "/blog/hello")
-     * -> { slug: "hello" }
-     *
-     * extractParams("/users/[id]/posts/[postId]/page.html", "/users/5/posts/10")
-     * -> { id: "5", postId: "10" }
-     */
     this.extractParams = function (filePath, pathname) {
       const routeParts = filePath
         .replace(/\/page\.[^/]+$/, "")
         .split("/")
         .filter(Boolean);
-  
+
       const pathParts = pathname.split("/").filter(Boolean);
-  
+
       const params = {};
-  
+
       let i = routeParts.length - 1;
       let j = pathParts.length - 1;
-  
+
       while (i >= 0 && j >= 0) {
         const part = routeParts[i];
-  
-        // [...slug]
+
         if (part.startsWith("[...") && part.endsWith("]")) {
           params[part.slice(4, -1)] = pathParts.slice(0, j + 1);
           break;
         }
-  
-        // [slug]
+
         if (part.startsWith("[") && part.endsWith("]")) {
           params[part.slice(1, -1)] = decodeURIComponent(pathParts[j]);
         }
-  
+
         i--;
         j--;
       }
-  
+
       return params;
-    }
+    };
   }
 
   return Router;
