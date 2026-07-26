@@ -11,7 +11,7 @@ File-based routing ships via the separate `olum-router` package (already include
 npm i olum-router
 ```
 
-Don't need routing? See [Opting out](#opting-out--your-own-mainjs) below to drop it.
+Don't need routing? See [Opting out](#opting-out-your-own-mainjs) below to drop it.
 :::
 
 Olum uses **file-based routing** — every route is a folder under `src/` and the files inside it declare how that URL renders. There is no route config to maintain: the file tree **is** the route table.
