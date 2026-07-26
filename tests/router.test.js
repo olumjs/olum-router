@@ -17,7 +17,7 @@ const PASS_ICON = green("✔");
 const FAIL_ICON = red("✖");
 
 const ROUTER_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/router.js"),
+  path.join(__dirname, "../core/router.js"),
   "utf8",
 );
 function load(url) {

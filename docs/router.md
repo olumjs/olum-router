@@ -4,6 +4,12 @@ group: Routing
 order: 170
 ---
 
+:::note[Package]
+File-based routing ships via the separate `olum-router` package — `npm i olum-router` at
+the project root (already included in the starter template). Don't need routing? See
+[Opting out](#opting-out--your-own-mainjs) below to drop it.
+:::
+
 Olum uses **file-based routing** — every route is a folder under `src/` and the files inside it declare how that URL renders. There is no route config to maintain: the file tree **is** the route table.
 
 ```text title="Project structure"
