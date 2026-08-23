@@ -254,7 +254,8 @@ export default (function () {
             links[i].setAttribute("href", "javascript:void(0)");
 
           links[i].addEventListener("click", function (e) {
-            var path = e.target.getAttribute("to");
+            var path = e.currentTarget.getAttribute("to");
+            if (!isDef(path)) return;
             var _path_ = resolve(path);
             var current = $this.pathname();
             if (_path_ === current) return;
