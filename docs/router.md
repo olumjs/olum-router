@@ -81,7 +81,7 @@ whole setup — and you can remove `olum-router` from `package.json` entirely:
 import Olum from "olum";
 import page from "./page.js";
 
-new Olum().$("#app").use(page);
+new Olum().$("#olum-app").use(page);
 ```
 
 If you instead want to configure the router **yourself** (your own route table instead of the
@@ -103,8 +103,8 @@ export const routes = [
 
 // const config = { mode: "history", root: "/", routes: routes };
 // const router = new Router(config);
-// new Olum().$("#app").use(router);
-new Olum().$("#app").use(Home);
+// new Olum().$("#olum-app").use(router);
+new Olum().$("#olum-app").use(Home);
 ```
 
 If you also have a `not-found.html`, give it a route (`{ path: "/404", comp: NotFound }`) and
