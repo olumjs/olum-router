@@ -5,7 +5,7 @@ order: 220
 ---
 
 - The router uses **history mode by default** (clean URLs like `/blog/hello`). If the browser lacks the History API it **falls back to hash mode** (`/#/blog/hello`).
-- History mode needs the server to serve `index.html` for unknown paths — see [Build & Deploy](/docs/build-and-deploy) for host configuration.
+- History mode needs the server to serve `index.html` for unknown paths — see [Build & Deploy](/docs/build-and-deploy) for host configuration. **[Prerendered](/docs/prerendering) routes need no such rewrite**: each one is written to `dist/<route>/index.html`, which every static host resolves on its own.
 - Add a `not-found.html` at the **root of your project's `src/` directory** and it becomes the default 404 page, rendered whenever no route matches. Without it, an unmatched URL renders a plain "Page Not Found!" text in the app root.
 
 ## Dynamic segments

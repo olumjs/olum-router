@@ -13,6 +13,7 @@ order: 180
 | `01-name/` | A numeric ordering prefix (digits + dash) is stripped from the URL — `01-guide/page.html` serves `/guide`. Digits elsewhere in the name are kept (`7guis/` still serves `/7guis`). |
 | `_name/` | Skipped entirely. A folder starting with `_` never produces routes, no matter what it contains. |
 | `components/`, `utils/` | Skipped entirely. These reserved folder names are excluded from routing at any depth — shared components and helpers never become routes. |
+| `sitemap.js` | Not a route. At `src/sitemap.js` it switches on [prerendering](/docs/prerendering) and lists the concrete URLs behind your dynamic segments (`/blog/hello` for `/blog/:slug`). Build-time only — it never ships to the browser. |
 
 :::warn
 These filenames are **case-sensitive**. It must be exactly `page.html` and `not-found.html` (all lowercase) — variants like `Page.html` or `Not-Found.html` are not recognized.
