@@ -1,6 +1,6 @@
 /**
 * @name olum-router
-* @version 0.5.2
+* @version 0.5.3
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
@@ -257,10 +257,28 @@ export default (function () {
       var links = [].slice.call(document.querySelectorAll("[to]"));
       if (isFullArr(links)) {
         for (var i = 0; i < links.length; i++) {
-          if (links[i].nodeName === "A")
-            links[i].setAttribute("href", "javascript:void(0)");
-
+          if (links[i].nodeName === "A" && !links[i].getAttribute("href")) {
+            var toAttr = links[i].getAttribute("to");
+            if (isDef(toAttr)) {
+              var resolved = resolve(toAttr);
+              links[i].setAttribute(
+                "href",
+                mode === "history" ? resolved : hashHref(resolved),
+              );
+            }
+          }
           links[i].addEventListener("click", function (e) {
+            if (
+              e.button !== 0 ||
+              e.ctrlKey ||
+              e.metaKey ||
+              e.shiftKey ||
+              e.altKey
+            )
+              return;
+            var target = e.currentTarget.getAttribute("target");
+            if (isDef(target) && target !== "_self") return;
+            e.preventDefault();
             var path = e.currentTarget.getAttribute("to");
             if (!isDef(path)) return;
             var _path_ = resolve(path);

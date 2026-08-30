@@ -1,6 +1,6 @@
 {
   "name": "olum-router",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "A router of olumjs library",
   "main": "dist/router.js",
   "directories": {
