@@ -20,13 +20,16 @@ const ROUTER_SRC = fs.readFileSync(
   path.join(__dirname, "../core/router.js"),
   "utf8",
 );
-function load(url) {
+function load(url, src) {
   const dom = new JSDOM("<!doctype html><body></body>", {
     url: url || "http://localhost/",
     runScripts: "outside-only",
   });
   dom.window.eval(
-    ROUTER_SRC.replace(/^\s*export\s+default\s+/m, "window.__Router = "),
+    (src || ROUTER_SRC).replace(
+      /^\s*export\s+default\s+/m,
+      "window.__Router = ",
+    ),
   );
   const Router = dom.window.__Router;
   const extractParams = (fp, pn) =>
@@ -93,8 +96,8 @@ const view = (tag) => {
   return f;
 };
 
-function makeRouter(config, url) {
-  const env = load(url);
+function makeRouter(config, url, src) {
+  const env = load(url, src);
   const calls = [];
   const router = new env.Router(config);
   router.render = (View) => calls.push(View.tag);
@@ -336,15 +339,19 @@ check("freeze() suppresses route callbacks on popstate", () => {
 check("unfreeze() restores route callbacks", () => {
   const { router, window, calls } = makeRouter({
     mode: "history",
-    routes: [{ path: "/", comp: view("H") }],
+    routes: [
+      { path: "/", comp: view("H") },
+      { path: "/about", comp: view("A") },
+    ],
   });
   silent(() => router.listen());
   router.freeze();
+  window.history.pushState({}, "", "/about");
   silent(() => window.dispatchEvent(new window.PopStateEvent("popstate")));
   const frozen = calls.length;
   router.unfreeze();
   silent(() => window.dispatchEvent(new window.PopStateEvent("popstate")));
-  return calls.length === frozen + 1;
+  return calls.length === frozen + 1 && calls[calls.length - 1] === "A";
 });
 
 section("§7 route matching");
@@ -400,6 +407,408 @@ check("an unmatched route falls back to the configured err route", () => {
   return calls[calls.length - 1] === "NotFound";
 });
 
+section("§8 searchParams()");
+
+check("history mode reads the query from location.search", () => {
+  const { router } = makeRouter(
+    { mode: "history", routes: [{ path: "/shop", comp: view("S") }] },
+    "http://localhost/shop?size=10&color=blue",
+  );
+  const q = router.searchParams();
+  return q.size === 10 && q.color === "blue" && Object.keys(q).length === 2;
+});
+
+check(
+  "hash mode reads the query inside the hash, and pathname() ignores it",
+  () => {
+    const { router } = makeRouter(
+      { routes: [{ path: "/shop", comp: view("S") }] },
+      "http://localhost/#/shop?size=10&color=blue",
+    );
+    const q = router.searchParams();
+    return q.size === 10 && q.color === "blue" && router.pathname() === "/shop";
+  },
+);
+
+check("hash mode merges a query before the hash with the one inside it", () => {
+  const { router } = makeRouter(
+    { routes: [{ path: "/shop", comp: view("S") }] },
+    "http://localhost/?utm=mail#/shop?size=10",
+  );
+  const q = router.searchParams();
+  return q.utm === "mail" && q.size === 10;
+});
+
+check("no query gives an empty object", () => {
+  const { router } = makeRouter(
+    { mode: "history", routes: [{ path: "/shop", comp: view("S") }] },
+    "http://localhost/shop",
+  );
+  return Object.keys(router.searchParams()).length === 0;
+});
+
+check("repeated keys become arrays", () => {
+  const { router } = makeRouter(
+    { mode: "history", routes: [{ path: "/", comp: view("H") }] },
+    "http://localhost/?tag=a&tag=b&tag=3",
+  );
+  const t = router.searchParams().tag;
+  return (
+    Array.isArray(t) &&
+    t.length === 3 &&
+    t[0] === "a" &&
+    t[1] === "b" &&
+    t[2] === 3
+  );
+});
+
+check("only exact numbers become numbers", () => {
+  const { router } = makeRouter(
+    { mode: "history", routes: [{ path: "/", comp: view("H") }] },
+    "http://localhost/?a=10&b=-5&c=1.5&zip=02134&exp=1e3&hex=0x10&inf=Infinity&nan=NaN&sp=%205&id=12345678901234567890&e=",
+  );
+  const q = router.searchParams();
+  return (
+    q.a === 10 &&
+    q.b === -5 &&
+    q.c === 1.5 &&
+    q.zip === "02134" &&
+    q.exp === "1e3" &&
+    q.hex === "0x10" &&
+    q.inf === "Infinity" &&
+    q.nan === "NaN" &&
+    q.sp === " 5" &&
+    q.id === "12345678901234567890" &&
+    q.e === ""
+  );
+});
+
+check("keys like toString / constructor / __proto__ are plain values", () => {
+  const { router } = makeRouter(
+    { mode: "history", routes: [{ path: "/", comp: view("H") }] },
+    "http://localhost/?toString=a&constructor=b&__proto__=c",
+  );
+  const q = router.searchParams();
+  return q.toString === "a" && q.constructor === "b" && q["__proto__"] === "c";
+});
+
+check("push() keeps the query case but still matches the route", () => {
+  const { router, window, calls } = makeRouter({
+    mode: "history",
+    routes: [
+      { path: "/", comp: view("H") },
+      { path: "/shop", comp: view("S") },
+    ],
+  });
+  silent(() => router.listen());
+  silent(() => router.push("/Shop?color=Blue"));
+  return (
+    window.location.pathname === "/shop" &&
+    window.location.search === "?color=Blue" &&
+    router.searchParams().color === "Blue" &&
+    calls[calls.length - 1] === "S"
+  );
+});
+
+check("hash push() with a root keeps the query untouched", () => {
+  const { router, window } = makeRouter({
+    root: "/app",
+    routes: [
+      { path: "/", comp: view("H") },
+      { path: "/shop", comp: view("S") },
+    ],
+  });
+  silent(() => router.push("/shop?next=/app/Cart"));
+  return (
+    window.location.hash === "#/shop?next=/app/Cart" &&
+    router.searchParams().next === "/app/Cart"
+  );
+});
+
+check(
+  "`to` links: query counts for the no-op check, not for the active class",
+  () => {
+    const { router, window, document, calls } = makeRouter(
+      {
+        mode: "history",
+        routes: [
+          { path: "/", comp: view("H") },
+          { path: "/shop", comp: view("S") },
+        ],
+      },
+      "http://localhost/shop?color=red",
+    );
+    document.body.innerHTML =
+      '<a id="red" to="/shop?color=red">r</a><a id="blue" to="/shop?color=blue">b</a>';
+    window.setTimeout = (fn) => fn();
+    silent(() => router.listen());
+    const red = document.getElementById("red");
+    const blue = document.getElementById("blue");
+    const bothActive =
+      /active/.test(red.className) && /active/.test(blue.className);
+    const click = (el) =>
+      silent(() =>
+        el.dispatchEvent(
+          new window.MouseEvent("click", { bubbles: true, button: 0 }),
+        ),
+      );
+    const before = calls.length;
+    click(red);
+    const sameIsNoop =
+      calls.length === before && window.location.search === "?color=red";
+    click(blue);
+    return (
+      bothActive &&
+      sameIsNoop &&
+      window.location.search === "?color=blue" &&
+      calls.length > before
+    );
+  },
+);
+
+section("§9 same-route guard");
+
+const twoRoutes = (extra) =>
+  Object.assign(
+    {
+      routes: [
+        { path: "/", comp: view("H") },
+        { path: "/match", comp: view("M") },
+      ],
+    },
+    extra,
+  );
+
+check("history push() to the current route does nothing", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+  );
+  silent(() => router.listen());
+  const before = { renders: calls.length, entries: window.history.length };
+  silent(() => router.push("/match"));
+  silent(() => router.push("/Match/"));
+  return (
+    calls.length === before.renders && window.history.length === before.entries
+  );
+});
+
+check("history replace() to the current route does nothing", () => {
+  const { router, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+  );
+  silent(() => router.listen());
+  const before = calls.length;
+  silent(() => router.replace("/match"));
+  return calls.length === before;
+});
+
+check("push() to the same path with another query still navigates", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match?page=1",
+  );
+  silent(() => router.listen());
+  const before = calls.length;
+  silent(() => router.push("/match?page=1"));
+  const sameIsNoop = calls.length === before;
+  silent(() => router.push("/match?page=2"));
+  return (
+    sameIsNoop &&
+    calls.length === before + 1 &&
+    window.location.search === "?page=2"
+  );
+});
+
+check("an encoded query matches its plain form", () => {
+  const { router, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match?q=a%20b",
+  );
+  silent(() => router.listen());
+  const before = calls.length;
+  silent(() => router.push("/match?q=a b"));
+  return calls.length === before;
+});
+
+check("hash mode with a root: push() to the current route does nothing", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ root: "/app" }),
+    "http://localhost/#/match",
+  );
+  silent(() => router.listen());
+  router.freeze();
+  silent(() => router.push("/match"));
+  const before = calls.length;
+  silent(() => window.dispatchEvent(new window.PopStateEvent("popstate")));
+  return calls.length === before;
+});
+
+check("a frozen router stays frozen after a same-route push()", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+  );
+  silent(() => router.listen());
+  router.freeze();
+  silent(() => router.push("/match"));
+  const before = calls.length;
+  silent(() => window.dispatchEvent(new window.PopStateEvent("popstate")));
+  return calls.length === before;
+});
+
+section("§10 #fragment re-navigation");
+
+const REHASH = "location.replace(location.hash);";
+const REHASH_SRC = ROUTER_SRC.replace(
+  REHASH,
+  '(window.__rehash = (window.__rehash || 0) + 1, dispatchEvent(new PopStateEvent("popstate")));',
+);
+
+check("history mode: the re-navigation renders once and does not loop", () => {
+  if (REHASH_SRC === ROUTER_SRC) return false;
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match#comments",
+    REHASH_SRC,
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  return calls.join() === "M" && window.__rehash === 1;
+});
+
+check("history mode: no #fragment, no re-navigation", () => {
+  const { router, window } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+    REHASH_SRC,
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  return window.__rehash === undefined;
+});
+
+check("hash mode never re-navigates (location.hash holds the route)", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes(),
+    "http://localhost/#/match",
+    REHASH_SRC,
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  return calls.join() === "M" && window.__rehash === undefined;
+});
+
+check("the real re-navigation keeps the URL and adds no history entry", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match#comments",
+  );
+  window.setTimeout = (fn) => fn();
+  const entries = window.history.length;
+  silent(() => router.listen());
+  return (
+    calls.join() === "M" &&
+    window.location.href === "http://localhost/match#comments" &&
+    window.history.length === entries
+  );
+});
+
+function browserHashChange(window, url) {
+  window.history.pushState({}, "", url);
+  window.dispatchEvent(new window.PopStateEvent("popstate"));
+}
+
+check('a plain href="#id" change does not re-render the page', () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+    REHASH_SRC,
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  silent(() => browserHashChange(window, "/match#b"));
+  silent(() => browserHashChange(window, "/match#c"));
+  silent(() => browserHashChange(window, "/match"));
+  return calls.join() === "M" && window.__rehash === undefined;
+});
+
+check(
+  "push() to another #id on the same page keeps the page and re-navigates so it scrolls",
+  () => {
+    const { router, window, calls } = makeRouter(
+      twoRoutes({ mode: "history" }),
+      "http://localhost/match",
+      REHASH_SRC,
+    );
+    window.setTimeout = (fn) => fn();
+    silent(() => router.listen());
+    silent(() => router.push("/match#comments"));
+    return (
+      calls.join() === "M" &&
+      window.location.hash === "#comments" &&
+      window.__rehash === 1
+    );
+  },
+);
+
+check("a new path or query still renders, #id or not", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match#a",
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  silent(() => browserHashChange(window, "/match?page=2#a"));
+  silent(() => browserHashChange(window, "/#a"));
+  return calls.join() === "M,M,H";
+});
+
+check("clicking the #id already in the URL does not re-render", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match#a",
+    REHASH_SRC,
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  const rehashes = window.__rehash;
+  silent(() => browserHashChange(window, "/match#a"));
+  silent(() => browserHashChange(window, "/match#a"));
+  return calls.join() === "M" && window.__rehash === rehashes;
+});
+
+check(
+  "push() to the #id already in the URL scrolls again without re-rendering",
+  () => {
+    const { router, window, calls } = makeRouter(
+      twoRoutes({ mode: "history" }),
+      "http://localhost/match",
+      REHASH_SRC,
+    );
+    window.setTimeout = (fn) => fn();
+    silent(() => router.listen());
+    silent(() => router.push("/match#team"));
+    silent(() => router.push("/match#team"));
+    return calls.join() === "M" && window.__rehash === 2;
+  },
+);
+
+check("a frozen page is not marked as rendered", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  router.freeze();
+  silent(() => browserHashChange(window, "/"));
+  router.unfreeze();
+  silent(() => browserHashChange(window, "/#x"));
+  return calls.join() === "M,H";
+});
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -417,7 +826,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 28;
+const EXPECTED_CHECKS = 54;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(

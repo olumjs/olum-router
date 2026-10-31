@@ -9,10 +9,6 @@ export default (function () {
     return val !== undefined && val !== null;
   }
 
-  function isDev() {
-    return ["localhost", "127.0.0.1"].indexOf(global.location.hostname) !== -1;
-  }
-
   function isObj(obj) {
     return obj !== null && typeof obj === "object";
   }
@@ -68,6 +64,9 @@ export default (function () {
     var isFrozen = false;
     var popStateEvent = null;
     var viewLoaded = null;
+
+    var isRehashing = false;
+    var renderedPage = null;
     mode =
       config && config.mode === "history" && pushStateAPI ? "history" : "hash";
     root = config && config.root ? config.root : "/";
@@ -91,11 +90,12 @@ export default (function () {
       if (mode === "history")
         fragment = clear(decodeURIComponent(location.pathname));
       else if (mode === "hash")
-        fragment = clear(decodeURIComponent(location.hash));
+        fragment = clear(decodeURIComponent(splitQuery(location.hash)[0]));
       return "/" + fragment;
     };
 
     this.navigate = function (path) {
+      if (isCurrent(path)) return debug("Already on " + path);
       $this.unfreeze();
       path = resolve(path);
       if (mode === "history") {
@@ -112,6 +112,7 @@ export default (function () {
     };
 
     this.replace = function (path) {
+      if (isCurrent(path)) return debug("Already on " + path);
       $this.unfreeze();
       path = resolve(path);
       if (mode === "history") {
@@ -137,7 +138,8 @@ export default (function () {
 
     this.listen = function () {
       debug($this.__proto__);
-      global.addEventListener("popstate", function () {
+      global.addEventListener("popstate", function (e) {
+        if (isRehashing) return;
         debug(["Dispatched Popstate", routes]);
         var current = $this.pathname();
         var _root = "/" + clear(root);
@@ -146,6 +148,12 @@ export default (function () {
           mode === "hash" && root !== "/"
             ? (current = _root + current).replace(/\/$/, "")
             : current;
+
+        var page = current + location.search;
+        if (mode === "history" && page === renderedPage) {
+          if (e === popStateEvent) rehash();
+          return;
+        }
 
         var route;
         $this.params = {};
@@ -181,8 +189,12 @@ export default (function () {
         debug(["$this.params -> ", $this.params]);
 
         if (isDef(route)) {
-          if (!isFrozen) route.cb();
+          if (!isFrozen) {
+            renderedPage = page;
+            route.cb();
+          }
         } else {
+          renderedPage = page;
           if (isDef(err)) {
             var _err;
             for (var index = 0; index < routes.length; index++) {
@@ -228,22 +240,51 @@ export default (function () {
       return params;
     }
 
+    function splitQuery(str) {
+      str = String(str);
+      var i = str.indexOf("?");
+      return i === -1 ? [str, ""] : [str.slice(0, i), str.slice(i + 1)];
+    }
+
     function resolve(path) {
+      var parts = splitQuery(path);
       var _root = clear(root);
-      path = clear(path);
+      path = clear(parts[0]);
       path = root !== "/" ? "/" + _root + "/" + path : "/" + path;
-      return path !== "/" ? path.replace(/\/$/g, "") : path;
+      path = path !== "/" ? path.replace(/\/$/g, "") : path;
+      return parts[1] ? path + "?" + parts[1] : path;
+    }
+
+    function isCurrent(path) {
+      var target = splitQuery(resolve(path));
+      var current = $this.pathname();
+      if (mode === "hash" && root !== "/")
+        current = ("/" + clear(root) + current).replace(/\/$/, "");
+
+      var targetQuery = new URLSearchParams(target[1]).toString();
+      var nowQuery = new URLSearchParams(currentQuery()).toString();
+      return target[0] === current && targetQuery === nowQuery;
+    }
+
+    function currentQuery() {
+      var query = location.search.slice(1);
+      if (mode === "hash") {
+        var hashQuery = splitQuery(location.hash)[1];
+        if (hashQuery) query = query ? query + "&" + hashQuery : hashQuery;
+      }
+      return query;
     }
 
     function hashHref(path) {
       var base = location.href.replace(/\#.*/g, "");
       if (root === "/") return base + "#" + path;
+      var parts = splitQuery(path);
       var _root = clear(root);
       _root = _root.replace(/\//g, "\\/");
       var rootRegex = new RegExp("\\/" + _root, "g");
-      var _path = path.replace(rootRegex, "");
+      var _path = parts[0].replace(rootRegex, "");
       _path = "/" + _path.replace(/^\//g, "");
-      return base + "#" + _path;
+      return base + "#" + _path + (parts[1] ? "?" + parts[1] : "");
     }
 
     function to() {
@@ -274,9 +315,6 @@ export default (function () {
             e.preventDefault();
             var path = e.currentTarget.getAttribute("to");
             if (!isDef(path)) return;
-            var _path_ = resolve(path);
-            var current = $this.pathname();
-            if (_path_ === current) return;
             $this.navigate(path);
           });
         }
@@ -287,11 +325,18 @@ export default (function () {
       var links = [].slice.call(document.querySelectorAll("[to]"));
       if (isFullArr(links)) {
         for (var i = 0; i < links.length; i++) {
-          var path_a = resolve(links[i].getAttribute("to"));
+          var path_a = splitQuery(resolve(links[i].getAttribute("to")))[0];
           if (path_a === path_b) links[i].className += " active";
           else links[i].className = links[i].className.replace(/active/g, "");
         }
       }
+    }
+
+    function rehash() {
+      if (mode !== "history" || !location.hash) return;
+      isRehashing = true;
+      location.replace(location.hash);
+      isRehashing = false;
     }
 
     function mount(View) {
@@ -302,6 +347,7 @@ export default (function () {
         setTimeout(() => {
           active($this.pathname());
           to();
+          rehash();
           if (isDef(viewLoaded)) {
             dispatchEvent(viewLoaded);
             debug("viewLoaded");
@@ -372,6 +418,20 @@ export default (function () {
       }
 
       return params;
+    };
+
+    this.searchParams = function () {
+      var result = Object.create(null);
+
+      new URLSearchParams(currentQuery()).forEach(function (value, key) {
+        var num = Number(value);
+        var parsed =
+          value !== "" && isFinite(num) && String(num) === value ? num : value;
+
+        result[key] = key in result ? [].concat(result[key], parsed) : parsed;
+      });
+
+      return result;
     };
   }
 

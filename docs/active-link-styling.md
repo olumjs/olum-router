@@ -12,6 +12,8 @@ When the current URL matches a link's `to` path, the router automatically adds a
 <a to="/about">About</a>
 ````
 
+The query string is ignored for this match: `<a to="/shop?color=red">` is active on `/shop`, `/shop?color=blue`, and so on. Clicking a link whose path **and** query already match the current URL does nothing.
+
 Target the class in your styles to highlight the active link:
 
 ````css title="src/nav.css"

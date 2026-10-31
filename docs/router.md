@@ -116,5 +116,5 @@ reference the compiled name — `src/page.html` is imported as `./page.js`.
 :::
 
 :::note
-After each route's view mounts, the router dispatches a `viewLoaded` event on `window` — handy for analytics or scroll restoration: `window.addEventListener("viewLoaded", () => scrollTo(0, 0))`.
+After each route's view mounts, the router dispatches a `viewLoaded` event on `window` — handy for analytics or scroll restoration: `window.addEventListener("viewLoaded", () => scrollTo(0, 0))`. It fires after the router has scrolled to a URL `#id`, so skip your own scroll when there is one: `if (!location.hash) scrollTo(0, 0)`.
 :::
