@@ -809,6 +809,119 @@ check("a frozen page is not marked as rendered", () => {
   return calls.join() === "M,H";
 });
 
+section("§11 setSearchParam()");
+
+check("searchParams() returns only the query (no function mixed in)", () => {
+  const { router } = makeRouter(
+    { mode: "history", routes: [{ path: "/shop", comp: view("S") }] },
+    "http://localhost/shop?a=1",
+  );
+  const q = router.searchParams();
+  return Object.keys(q).join() === "a" && !("setSearchParam" in q);
+});
+
+check(
+  "history mode: sets, overwrites and deletes without a render or a history entry",
+  () => {
+    const { router, window, calls } = makeRouter(
+      twoRoutes({ mode: "history" }),
+      "http://localhost/match?keep=x",
+    );
+    silent(() => router.listen());
+    const entries = window.history.length;
+    router.setSearchParam("color", "Blue");
+    const set = window.location.search === "?keep=x&color=Blue";
+    router.setSearchParam("color", "red");
+    const overwritten = router.searchParams().color === "red";
+    router.setSearchParam("color", null);
+    router.setSearchParam("keep", "");
+    return (
+      set &&
+      overwritten &&
+      window.location.href === "http://localhost/match" &&
+      calls.join() === "M" &&
+      window.history.length === entries
+    );
+  },
+);
+
+check(
+  "an array becomes a repeated key that searchParams() reads back as an array",
+  () => {
+    const { router } = makeRouter(
+      { mode: "history", routes: [{ path: "/", comp: view("H") }] },
+      "http://localhost/?tag=old",
+    );
+    router.setSearchParam("tag", ["a", 2]);
+    const t = router.searchParams().tag;
+    return Array.isArray(t) && t.join() === "a,2";
+  },
+);
+
+check("keeps the #id and the history state", () => {
+  const { router, window } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match#comments",
+  );
+  window.history.replaceState({ x: 1 }, "", window.location.href);
+  router.setSearchParam("page", 2);
+  return (
+    window.location.href === "http://localhost/match?page=2#comments" &&
+    window.history.state.x === 1
+  );
+});
+
+check(
+  "history mode: an #id click after setSearchParam() does not re-render",
+  () => {
+    const { router, window, calls } = makeRouter(
+      twoRoutes({ mode: "history" }),
+      "http://localhost/match",
+      REHASH_SRC,
+    );
+    window.setTimeout = (fn) => fn();
+    silent(() => router.listen());
+    router.setSearchParam("page", 2);
+    silent(() => browserHashChange(window, "/match?page=2#b"));
+    return calls.join() === "M";
+  },
+);
+
+check("history mode: push() back to the old query renders again", () => {
+  const { router, window, calls } = makeRouter(
+    twoRoutes({ mode: "history" }),
+    "http://localhost/match",
+  );
+  window.setTimeout = (fn) => fn();
+  silent(() => router.listen());
+  router.setSearchParam("page", 2);
+  silent(() => router.push("/match"));
+  return calls.join() === "M,M" && window.location.search === "";
+});
+
+check(
+  "hash mode: writes the query inside the hash and drops a copy before it",
+  () => {
+    const { router, window, calls } = makeRouter(
+      twoRoutes(),
+      "http://localhost/?color=old&utm=mail#/match?color=blue",
+    );
+    silent(() => router.listen());
+    router.setSearchParam("color", "red");
+    const set =
+      window.location.href === "http://localhost/?utm=mail#/match?color=red" &&
+      router.searchParams().color === "red";
+    router.setSearchParam("color", null);
+    return (
+      set &&
+      window.location.hash === "#/match" &&
+      router.searchParams().utm === "mail" &&
+      router.pathname() === "/match" &&
+      calls.join() === "M"
+    );
+  },
+);
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -826,7 +939,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 54;
+const EXPECTED_CHECKS = 61;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(

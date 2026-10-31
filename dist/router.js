@@ -1,6 +1,6 @@
 /**
 * @name olum-router
-* @version 0.6.0
+* @version 0.6.1
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
@@ -425,6 +425,33 @@ export default (function () {
       }
 
       return params;
+    };
+
+    this.setSearchParam = function (key, value) {
+      function apply(params) {
+        params.delete(key);
+        if (!isDef(value) || value === "") return;
+        [].concat(value).forEach(function (v) {
+          params.append(key, v);
+        });
+      }
+
+      var url = new URL(location.href);
+      if (mode === "hash") {
+        var parts = splitQuery(url.hash);
+        var hashParams = new URLSearchParams(parts[1]);
+        apply(hashParams);
+        url.searchParams.delete(key);
+        var query = hashParams.toString();
+        url.hash = parts[0] + (query ? "?" + query : "");
+      } else {
+        apply(url.searchParams);
+      }
+
+      if (url.href === location.href) return;
+      global.history.replaceState(global.history.state, "", url.href);
+
+      if (mode === "history") renderedPage = $this.pathname() + location.search;
     };
 
     this.searchParams = function () {
