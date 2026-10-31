@@ -1,6 +1,6 @@
 /**
 * @name olum-router
-* @version 0.5.3
+* @version 0.6.0
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
