@@ -1,20 +1,15 @@
 ---
 title: Active Link Styling
 group: Routing
-order: 215
+order: 50
 ---
 
-When the current URL matches a link's `to` path, the router automatically adds an `active` class to that anchor. Use it to style the current route — no extra wiring needed.
+The router adds an `active` class to every `to` link that matches the current URL. Style it in CSS:
 
 ````html title="src/nav.html"
-<!-- The router adds `active` to whichever anchor matches the current URL. -->
 <a to="/">Home</a>
-<a to="/about">About</a>
+<a to="/about">About</a>   <!-- gets class="active" on /about -->
 ````
-
-The query string is ignored for this match: `<a to="/shop?color=red">` is active on `/shop`, `/shop?color=blue`, and so on. Clicking a link whose path **and** query already match the current URL does nothing.
-
-Target the class in your styles to highlight the active link:
 
 ````css title="src/nav.css"
 a.active {
@@ -23,6 +18,5 @@ a.active {
 }
 ````
 
-:::tip
-This only applies to anchors the router controls with the `to` attribute — see [Navigating with to](/docs/navigating-with-to).
-:::
+- The query string is ignored: `<a to="/shop?color=red">` is active on `/shop`, `/shop?color=blue`, and so on.
+- Only links with `to` get the class (see [Navigating with to](/docs/navigating-with-to)).

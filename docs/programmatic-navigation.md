@@ -1,27 +1,29 @@
 ---
 title: Programmatic Navigation
 group: Routing
-order: 212
+order: 60
 ---
 
-The [`to` attribute](/docs/navigating-with-to) covers links, but sometimes navigation happens from **code** — after a form submit, a successful login, a timeout. For that, import the navigation helpers from `olum`:
+For links, use the [`to` attribute](/docs/navigating-with-to) (it also gives you [active-link styling](/docs/active-link-styling) for free). To change the page **from code** (after a form submit, a login, a timer), import these helpers from `olum`:
 
 ```js
 import { push, replace, back, forward, go, pathname, searchParams, setSearchParam } from "olum";
 ```
 
-Each helper delegates to the active router instance and works in **both** `hash` and `history` mode — paths are resolved against the router's `root` for you.
+They work in both history and hash mode, and handle the router's `root` for you.
 
-| Helper | Action | History stack | Native equivalent |
-|--------|--------|---------------|-------------------|
-| `push(path)` | Navigate to a new URL | Adds a new entry | `history.pushState()` |
-| `replace(path)` | Navigate to a new URL | Overwrites the current entry | `history.replaceState()` |
-| `back()` | Move backward one step | Rewinds current position | `history.back()` |
-| `forward()` | Move forward one step | Advances current position | `history.forward()` |
-| `go(n)` | Move by `n` steps (negative = back) | Jumps to a specific index | `history.go(n)` |
-| `pathname()` | Read the current route path | — | `location.pathname` |
-| `searchParams()` | Read the query string as an object | — | `location.search` |
-| `setSearchParam(key, value)` | Set or delete one query param, without rendering | Overwrites the current entry | `history.replaceState()` |
+| Helper | What it does | Back button |
+|--------|--------------|-------------|
+| `push(path)` | go to a new page | returns to this page |
+| `replace(path)` | go to a new page | skips this page (it's replaced) |
+| `back()` | go back one step | |
+| `forward()` | go forward one step | |
+| `go(n)` | move `n` steps (negative = back) | |
+| `pathname()` | read the current path | |
+| `searchParams()` | read the query string as an object | |
+| `setSearchParam(key, value)` | change one query value **without rendering the page again** | not affected |
+
+They match the browser's `history.pushState()`, `history.replaceState()`, `history.back()`, `history.forward()`, `history.go(n)`, `location.pathname` and `location.search`.
 
 ## Example
 
@@ -30,10 +32,8 @@ Each helper delegates to the active router instance and works in **both** `hash`
   import { replace, back } from "olum";
 
   const login = () => {
-    // ...authenticate...
-    // `replace` so the login page doesn't stay in history —
-    // pressing Back afterwards won't return to the form.
-    replace("/dashboard");
+    // ...check the password...
+    replace("/dashboard");   // Back won't return to the login form
   };
 
   const cancel = () => back();
@@ -45,16 +45,18 @@ Each helper delegates to the active router instance and works in **both** `hash`
 </form>
 ```
 
-## `push` vs `replace`
+## `push` or `replace`?
 
-Both navigate to a new route; the difference is what the **Back button** does afterwards:
+- `push("/cart")` adds a history entry, so Back returns to where you were. Same as clicking a link.
+- `replace("/dashboard")` replaces the current entry, so Back skips it. Use it for redirects (after login, old URLs) where going back makes no sense.
 
-- `push("/cart")` — adds an entry, so Back returns to the page you came from. This is what a normal link click does.
-- `replace("/dashboard")` — swaps the current entry, so the page you were on disappears from history. Use it for redirects (login flows, deprecated URLs) where returning to the intermediate page makes no sense.
+Both do nothing if the target is the **current** path and query: no render, no history entry, state is kept. A different query counts as a new page.
 
-## Reading the current route
+In history mode, a path can end with `#id`: `push("/match/chelsea/7#comments")`. On the current page it only scrolls; on another page it renders, then scrolls. See [Links to a section](/docs/navigating-with-to#links-to-a-section-id).
 
-`pathname()` returns the current route path, normalized the same way the router matches it — leading slash, no trailing slash, and in hash mode the part after `#`:
+## Reading the current path
+
+`pathname()` returns the current path, cleaned up the same way the router sees it: starts with `/`, no trailing `/`, no query. In hash mode it's the part after `#`.
 
 ```js
 import { pathname } from "olum";
@@ -66,7 +68,7 @@ if (pathname() === "/checkout") {
 
 ## Reading the query string
 
-`searchParams()` returns the query string of the current URL as a plain object. It works in both modes — in hash mode the query can sit inside the hash (`/#/shop?size=10`), before it (`/?size=10#/shop`), or both:
+`searchParams()` returns the query as a plain object:
 
 ```js
 import { searchParams } from "olum";
@@ -78,29 +80,26 @@ const { size, color, tag } = searchParams();
 // tag   -> ["a", "b"]  (a repeated key becomes an array)
 ```
 
-- Only **exact** numbers are converted: `"10"`, `"-5"` and `"1.5"` become numbers, but `"02134"`, `"1e3"`, `"0x10"` and `"Infinity"` stay strings, so zip codes and long IDs are safe.
-- Everything else is a string — `"true"` is not turned into `true`.
-- The object has no prototype, so a key like `toString` or `__proto__` is just a value.
+- Only **exact** numbers become numbers: `"10"`, `"-5"`, `"1.5"`. Things like `"02134"`, `"1e3"`, `"0x10"` and `"Infinity"` stay text, so zip codes and long IDs are safe.
+- Everything else is text. `"true"` stays `"true"`.
+- Keys like `toString` or `__proto__` are just normal values (the object has no prototype).
+- In hash mode the query can be inside the hash (`/#/shop?size=10`), before it (`/?size=10#/shop`), or both.
 
-`searchParams()` reads the URL at the moment you call it — it is not reactive. That is enough in a page's `<script>`: navigating to a new query (a link, `push()`, Back/Forward) renders the page again, so the script runs again with the new values.
-
-`pathname()` never includes the query.
+`searchParams()` is **not reactive**: it reads the URL when you call it. That's enough in a page's `<script>`, because going to a new query (link, `push()`, Back/Forward) renders the page again and the script runs again.
 
 ## Changing the query
 
-There are two ways, depending on whether the page should render again:
+| You want to… | Use | Page renders again? | History |
+|--------------|-----|---------------------|---------|
+| go to a new query, like a link | `push("/shop?size=12")` | yes, `<script>` runs again | adds an entry |
+| same, without a Back step | `replace("/shop?size=12")` | yes | replaces the entry |
+| just remember UI state in the URL | `setSearchParam("size", 12)` | **no**, state is kept | replaces the entry |
 
-| You want | Use | Renders | History |
-|----------|-----|---------|---------|
-| Go to a new query, like a link would | `push("/shop?size=12")` | yes — the page's `<script>` runs again | adds an entry |
-| The same, without a Back step | `replace("/shop?size=12")` | yes | overwrites the entry |
-| Only reflect UI state in the URL | `setSearchParam("size", 12)` | **no** — the page keeps its state | overwrites the entry |
-
-With `push()` / `replace()` the path part is matched against your routes as usual (lowercased), but the query is kept exactly as you wrote it.
+With `push()` / `replace()` the path is lowercased for matching, but the query is kept exactly as written.
 
 ## Updating the query without rendering
 
-`setSearchParam(key, value)` changes one query param of the current URL **in place**: the page is not rendered again, keeps its state (focus, scroll, typed input), and no history entry is added. Use it to mirror UI state in the URL — a tab, a filter, a page number, a search box — so a reload or a shared link comes back to the same view:
+`setSearchParam(key, value)` changes one query value **in place**. The page isn't rendered again (focus, scroll and typed text are kept) and no history entry is added. Use it to save a tab, filter, page number or search in the URL, so a refresh or a shared link shows the same view:
 
 ```js
 import { setSearchParam } from "olum";
@@ -113,7 +112,7 @@ setSearchParam("tag", []);         // -> /shop?size=12&color=Blue
 setSearchParam("color", null);     // -> /shop?size=12
 ```
 
-The usual pattern: **read** the query once into `state` at the top of `<script>`, and **write** each change to both `state` (so the page updates) and the URL (so it survives a reload):
+**The usual pattern:** read the query into `state` once at the top of `<script>`, then on each change update **both** `state` (so the page updates) and the URL (so it survives a refresh):
 
 ```html title="src/shop/page.html"
 <script>
@@ -122,14 +121,14 @@ The usual pattern: **read** the query once into `state` at the top of `<script>`
   const TABS = ["all", "new", "sale"];
   const q = searchParams();
   const state = {
-    tab: TABS.includes(q.tab) ? q.tab : "all",           // never trust the URL: validate
+    tab: TABS.includes(q.tab) ? q.tab : "all",                 // never trust the URL: check it
     page: typeof q.page === "number" && q.page > 1 ? q.page : 1,
-    search: q.search === undefined ? "" : String(q.search), // "10" arrives as the number 10
+    search: q.search === undefined ? "" : String(q.search),    // "10" arrives as the number 10
   };
 
   const setTab = (tab) => {
     state.tab = tab;
-    setSearchParam("tab", tab === "all" ? null : tab); // keep the default out of the URL
+    setSearchParam("tab", tab === "all" ? null : tab);   // keep the default out of the URL
     setPage(1);
   };
   const setPage = (n) => {
@@ -138,7 +137,7 @@ The usual pattern: **read** the query once into `state` at the top of `<script>`
   };
   const setSearch = (value) => {
     state.search = value;
-    setSearchParam("search", value); // "" removes it
+    setSearchParam("search", value);                     // "" removes it
   };
 </script>
 
@@ -149,27 +148,17 @@ The usual pattern: **read** the query once into `state` at the top of `<script>`
 <button onclick="setPage(state.page + 1)">Next page ({state.page})</button>
 ```
 
-Typing in the search box updates the URL on every keystroke without the input losing focus, and reloading `/shop?tab=sale&page=3&search=shoes` opens the same view.
+Typing in the search box updates the URL on every key without losing focus, and opening `/shop?tab=sale&page=3&search=shoes` shows the same view.
 
-### Details worth knowing
+### Good to know
 
-- **Deleting:** `null`, `undefined`, `""` and an empty array remove the key. `0` and `false` are written as `"0"` and `"false"`.
-- **Arrays** are written as a repeated key (`?tag=a&tag=b`), so `searchParams()` reads them back as an array. A one-item array reads back as a plain value — `[].concat(q.tag)` turns either into an array.
-- **Values become strings** in the URL; `searchParams()` turns exact numbers back into numbers. Keys and values keep their case.
+- **Removing:** `null`, `undefined`, `""` and `[]` remove the key. `0` and `false` are written as `"0"` and `"false"`.
+- **Arrays** become a repeated key (`?tag=a&tag=b`), which `searchParams()` reads back as an array. A one-item array reads back as a single value; `[].concat(q.tag)` always gives you an array.
+- **Everything becomes text** in the URL; `searchParams()` turns exact numbers back into numbers. Case is kept.
 - **One key replaces all its values:** `setSearchParam("tag", "c")` on `?tag=a&tag=b` gives `?tag=c`.
-- **The rest of the URL is kept:** the path, the other params, the `#id` and `history.state`. Writing a value the URL already has does nothing.
-- **The whole query is re-encoded** when it changes, so a space shows as `+` (`?q=a+b`) and a bare `?flag` becomes `?flag=`. The values read back the same.
-- **Hash mode:** the param is written inside the hash (`/#/shop?color=Blue`). A copy of the same key before the hash (`/?color=x#/shop`) is removed, so `searchParams()` never sees two.
-- **No events fire:** no `popstate`, no `viewLoaded`, no render. Other components that read `searchParams()` keep their old value until they read it again — keep the value in `state` (or the [store](/docs/global-store)) when several components need it.
-- **Back skips these changes.** Since no history entry is added, Back leaves the page instead of undoing a filter. If each step should be undoable with Back, use `push()` instead (the page renders again).
-- **`#id` links keep working:** after `setSearchParam()`, an `<a href="#comments">` on the same page still only scrolls, and `push()` to the page without the query renders it again.
-
-## Navigating to the current page
-
-`push()` and `replace()` do nothing when the target has the same path and query as the current URL: no render, no history entry, and the page keeps its state. A different query is a new URL and navigates.
-
-In **history** mode a path can also end with an `#id` — `push("/match/chelsea/7#comments")`. On the current page this only scrolls (no render); on another page it renders, then scrolls. See [Links to a section](/docs/navigating-with-to#links-to-a-section-id).
-
-:::tip
-For **links**, prefer the [`to` attribute](/docs/navigating-with-to) — it also gives you [active-link styling](/docs/active-link-styling) for free. Reach for these helpers only when navigation is triggered by logic rather than a click on a link.
-:::
+- **The rest of the URL is kept:** the path, other params, the `#id` and `history.state`. Setting a value that's already there does nothing.
+- **The query is re-encoded** when it changes: a space becomes `+` (`?q=a+b`) and a bare `?flag` becomes `?flag=`. Values read back the same.
+- **Hash mode:** the value is written inside the hash (`/#/shop?color=Blue`). A copy of the same key before the hash (`/?color=x#/shop`) is removed, so `searchParams()` never sees two.
+- **No events fire:** no `popstate`, no `viewLoaded`, no render. Other components that read `searchParams()` keep the old value until they read it again. If several components need the value, keep it in `state` or a [store](/docs/store/global-store).
+- **Back skips these changes**, since no history entry is added. If each change should be undoable with Back, use `push()` (the page renders again).
+- **`#id` links still work** after `setSearchParam()`: `<a href="#comments">` on the same page only scrolls, and `push()` to the page without the query renders it again.

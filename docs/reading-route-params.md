@@ -1,24 +1,24 @@
 ---
 title: Reading Route Params
 group: Routing
-order: 190
+order: 30
 ---
 
-A dynamic segment's value is available in the page component through `params()`, imported from `olum` — no config, no wiring. Hitting `/blog/[slug]` exposes the captured segment, ready to destructure in `<script>` and use in the template:
+In a dynamic route like `src/blog/[slug]/page.html`, get the value from the URL with `params()`:
 
 ```html title="src/blog/[slug]/page.html"
-<!-- src/blog/[slug]/page.html -->
 <script>
   import { params } from "olum";
 
-  const { slug } = params();
+  const { slug } = params();   // on /blog/hello → "hello"
 </script>
 
 <h1>blog: {slug}</h1>
 ```
 
-## Details worth knowing
+## Good to know
 
-- **Call `params()` once, at the top level of `<script>`** — only the first call is compiled; destructure everything you need from that one call.
-- **Values arrive lowercased.** Route matching is case-insensitive (`/Blog/Hello` still matches `/blog/[slug]`), and the captured value comes back lowercased too: `slug === "hello"`.
-- Values are URL-decoded for you (`/blog/caf%C3%A9` → `café`), then lowercased.
+- **Call `params()` at the top of `<script>`** and take everything you need from it: `const { id, postId } = params();`.
+- **Values are lowercase.** URLs match without caring about case (`/Blog/Hello` matches), and the value comes back lowercased: `slug === "hello"`.
+- **Values are decoded** for you: `/blog/caf%C3%A9` → `café`.
+- For the query string (`?page=2`), use [`searchParams()`](/docs/programmatic-navigation#reading-the-query-string).

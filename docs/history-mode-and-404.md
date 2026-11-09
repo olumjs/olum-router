@@ -1,17 +1,21 @@
 ---
 title: History Mode & the 404 Page
 group: Routing
-order: 220
+order: 70
 ---
 
-- The router uses **history mode by default** (clean URLs like `/blog/hello`). If the browser lacks the History API it **falls back to hash mode** (`/#/blog/hello`).
-- History mode needs the server to serve `index.html` for unknown paths — see [Build & Deploy](/docs/build-and-deploy) for host configuration. **[Prerendered](/docs/prerendering) routes need no such rewrite**: each one is written to `dist/<route>/index.html`, which every static host resolves on its own.
-- Add a `not-found.html` at the **root of your project's `src/` directory** and it becomes the default 404 page, rendered whenever no route matches. Without it, an unmatched URL renders a plain "Page Not Found!" text in the app root.
+## Clean URLs (history mode)
 
-## Dynamic segments
+The router uses clean URLs like `/blog/hello` by default ("history mode"). In an old browser without the History API, it falls back to hash URLs like `/#/blog/hello`.
 
-Multiple dynamic segments in one path work — `/users/[id]/posts/[postId]/page.html` matches `/users/5/posts/10`, and [`params()`](/docs/reading-route-params) returns both values. When a URL could match both a static and a dynamic route, the **static route wins**.
+Clean URLs need one thing from your host: it must send `index.html` for every path that isn't a file. Otherwise refreshing `/blog/hello` shows a 404. See [Build & Deploy](/docs/core/build-and-deploy#deploying) for how to set it up.
 
-:::warn
-**No catch-all segments.** A `[...slug]` folder is not supported — each `[param]` matches exactly **one** URL segment, and a route only matches when the segment counts line up.
-:::
+[Prerendered](/docs/core/prerendering) pages don't need this: each one is a real file at `dist/<route>/index.html`, which every host serves.
+
+## The 404 page
+
+Add `not-found.html` directly in `src/`. It's shown whenever no route matches. Without it, an unknown URL shows plain "Page Not Found!" text.
+
+A `not-found.html` is a page like any other, so it can have its own [`<head>`](/docs/core/metadata) (title, `robots`, …).
+
+For dynamic routes, multiple params and the "no catch-all" rule, see [File Conventions](/docs/file-conventions#dynamic-routes).

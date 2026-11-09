@@ -1,24 +1,35 @@
 ---
 title: File Conventions
 group: Routing
-order: 180
+order: 20
 ---
 
-| File | What it does |
+How file and folder names in `src/` turn into routes, at a glance:
+
+| Name | What it does |
 |------|--------------|
-| `page.html` | The UI for a route. A folder becomes a navigable route only when it contains a `page.html` — e.g. `about/page.html` serves `/about`. |
-| `not-found.html` | Rendered when no route matches the current URL — the global 404 page. |
-| `[param]/` | A dynamic segment. `blog/[slug]/page.html` matches `/blog/:slug`, capturing the URL part as the `slug` param (e.g. `/blog/hello` → `slug = "hello"`). |
-| `(group)/` | A route group. The parenthesized folder is dropped from the URL — `(marketing)/pricing/page.html` serves `/pricing`. Use it to organize related routes without nesting the URL. |
-| `01-name/` | A numeric ordering prefix (digits + dash) is stripped from the URL — `01-guide/page.html` serves `/guide`. Digits elsewhere in the name are kept (`7guis/` still serves `/7guis`). |
-| `_name/` | Skipped entirely. A folder starting with `_` never produces routes, no matter what it contains. |
-| `components/`, `utils/` | Skipped entirely. These reserved folder names are excluded from routing at any depth — shared components and helpers never become routes. |
-| `sitemap.js` | Not a route. At `src/sitemap.js` it switches on [prerendering](/docs/prerendering) and lists the concrete URLs behind your dynamic segments (`/blog/hello` for `/blog/:slug`). Build-time only — it never ships to the browser. |
+| `page.html` | The page for a route. A folder only becomes a route if it has a `page.html`: `about/page.html` → `/about`. |
+| `not-found.html` | The 404 page, shown when no route matches. Put it directly in `src/`. |
+| `[param]/` | A **dynamic** part of the URL. `blog/[slug]/page.html` matches `/blog/hello` and gives you `slug = "hello"` ([Reading Route Params](/docs/reading-route-params)). |
+| `(group)/` | A **group** folder, left out of the URL. `(marketing)/pricing/page.html` → `/pricing`. Use it to organize files. |
+| `01-name/` | A **number prefix** (digits + dash) is removed from the URL: `01-guide/page.html` → `/guide`. Handy to sort folders. Digits elsewhere stay: `7guis/` → `/7guis`. |
+| `_name/` | **Skipped.** A folder starting with `_` never creates routes (good for drafts). |
+| `components/`, `utils/` | **Skipped**, at any depth. Put shared components and helpers here. |
+| `sitemap.js` | **Not a route.** `src/sitemap.js` turns on [prerendering](/docs/core/prerendering) and lists the real URLs for dynamic routes. Build-time only. |
 
 :::warn
-These filenames are **case-sensitive**. It must be exactly `page.html` and `not-found.html` (all lowercase) — variants like `Page.html` or `Not-Found.html` are not recognized.
+Names are **case-sensitive**: exactly `page.html` and `not-found.html`, all lowercase. `Page.html` won't work.
 :::
 
 :::tip
-Reusable components live in the `src/components` directory and their filenames are **PascalCase** — e.g. `src/components/AddTodo.html`. This keeps route files (`page.html` / `not-found.html`) separate from the components they render.
+Put reusable components in `src/components/` with **PascalCase** names, like `src/components/AddTodo.html`. That keeps them apart from route files.
+:::
+
+## Dynamic routes
+
+- A path can have several dynamic parts: `users/[id]/posts/[postId]/page.html` matches `/users/5/posts/10`, and [`params()`](/docs/reading-route-params) gives you both.
+- If a URL matches both a normal route and a dynamic one, the **normal route wins**.
+
+:::warn
+**No catch-all routes.** `[...slug]` is not supported. Each `[param]` matches exactly **one** part of the URL, and the number of parts must match.
 :::

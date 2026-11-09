@@ -1,25 +1,25 @@
 ---
 title: Router
 group: Routing
-order: 170
+order: 10
 ---
 
+Olum uses **file-based routing**: each folder in `src/` with a `page.html` is a page of your site. There's no route list to maintain. Your folders **are** the routes.
+
 :::note[Package]
-File-based routing ships via the separate `olum-router` package (already included in the starter template):
+Routing comes from the `olum-router` package (already in the starter template):
 
 ```bash
 npm i olum-router
 ```
 
-Don't need routing? See [Opting out](#opting-out--your-own-mainjs) below to drop it.
+Don't need routing? See [Using your own main.js](#opting-out--your-own-mainjs).
 :::
-
-Olum uses **file-based routing** — every route is a folder under `src/` and the files inside it declare how that URL renders. There is no route config to maintain: the file tree **is** the route table.
 
 ```text title="Project structure"
 src/
 ├── page.html                 → /
-├── not-found.html            → Global 404 page
+├── not-found.html            → 404 page
 │
 ├── about/
 │   └── page.html             → /about
@@ -27,55 +27,42 @@ src/
 ├── blog/
 │   ├── page.html             → /blog
 │   └── [slug]/
-│       └── page.html         → /blog/:slug
+│       └── page.html         → /blog/:slug  (e.g. /blog/hello)
 │
-├── users/
-│   ├── page.html             → /users
-│   └── [id]/
-│       └── page.html         → /users/:id
-│
-├── (marketing)/              → route group — not part of the URL
+├── (marketing)/              → group: not part of the URL
 │   └── pricing/
 │       └── page.html         → /pricing
 │
-├── 01-guide/                 → numeric ordering prefix — stripped from the URL
+├── 01-guide/                 → number prefix: removed from the URL
 │   └── page.html             → /guide
 │
-├── _drafts/                  → skipped entirely (leading underscore)
+├── _drafts/                  → skipped (starts with _)
 │   └── page.html             → (no route)
 │
-├── components/               → skipped entirely (reserved folder)
+├── components/               → skipped (reserved name)
 │   └── AddTodo.html          → (no route)
 │
-└── utils/                    → skipped entirely (reserved folder)
+└── utils/                    → skipped (reserved name)
     └── helpers.js            → (no route)
 ```
 
-## Folder conventions
+Every folder rule is explained in [File Conventions](/docs/file-conventions).
 
-Some folder names change how (or whether) routes are generated:
+## The `viewLoaded` event
 
-| Folder | Effect |
-|--------|--------|
-| `(group)/` | **Route group** — organizes files without affecting the URL. `(marketing)/pricing/page.html` serves `/pricing`, not `/(marketing)/pricing`. |
-| `01-name/` | **Ordering prefix** — leading digits followed by a dash are stripped from the URL. `01-guide/page.html` serves `/guide`. Handy for keeping folders sorted on disk. |
-| `_name/` | **Skipped entirely** — a folder starting with `_` (and everything inside it) never produces a route. Use it for drafts or work in progress. |
-| `components/`, `utils/` | **Skipped entirely** — these reserved folders are excluded from routing at any depth, so shared components and helpers can live next to your pages without becoming routes. |
+After each page appears, the router fires a `viewLoaded` event on `window`. Handy for analytics or scrolling to the top:
 
-:::tip
-Only the `NN-` prefix is stripped — digits elsewhere in a segment are kept as-is, so a folder like `7guis/` still serves `/7guis`.
-:::
+```js
+window.addEventListener("viewLoaded", () => {
+  if (!location.hash) scrollTo(0, 0);   // skip when the URL has an #id: the router already scrolled to it
+});
+```
 
 ## Opting out — your own `main.js`
 
-You don't need to write an entry point at all: **omit `src/main.js` and the file-based router
-above is set up for you out of the box** — the route table is compiled into an auto-generated
-`src/main.js`. If you create `src/main.js` yourself, the compiler **skips** that generation
-entirely and uses your file as the entry point — useful when you don't need routing and want
-to drop `olum-router`.
+Normally you don't write an entry file: **without `src/main.js`, Olum generates one** with all your routes. If you create `src/main.js` yourself, Olum uses yours instead and stops generating routes.
 
-Your `main.js` must then mount the app itself. If a single route is all you need, this is the
-whole setup — and you can remove `olum-router` from `package.json` entirely:
+**No routing at all** (one page, and you can remove `olum-router` from `package.json`):
 
 ```js title="src/main.js"
 import Olum from "olum";
@@ -84,37 +71,29 @@ import page from "./page.js";
 new Olum().$("#olum-app").use(page);
 ```
 
-If you instead want to configure the router **yourself** (your own route table instead of the
-generated one), the full setup looks like this — the same shape the auto-generated `main.js`
-has. As written it still mounts a single component; uncomment the three router lines (and
-remove the last line) to route manually:
+**Your own route list** (the same thing Olum would generate):
 
 ```js title="src/main.js"
 import Olum from "olum";
-// import Router from "olum-router";
+import Router from "olum-router";
 
 import Home from "./page.js";
 import About from "./about/page.js";
+import NotFound from "./not-found.js";
 
-export const routes = [
+const routes = [
   { path: "/", comp: Home },
-  { path: "/about", comp: About }
+  { path: "/about", comp: About },
+  { path: "/404", comp: NotFound }
 ];
 
-// const config = { mode: "history", root: "/", routes: routes };
-// const router = new Router(config);
-// new Olum().$("#olum-app").use(router);
-new Olum().$("#olum-app").use(Home);
+const router = new Router({ mode: "history", root: "/", err: "/404", routes: routes });
+new Olum().$("#olum-app").use(router);
 ```
 
-If you also have a `not-found.html`, give it a route (`{ path: "/404", comp: NotFound }`) and
-add `err: "/404"` to the config — see [History Mode & the 404 Page](/docs/history-mode-and-404).
+- `err: "/404"` tells the router which route is the 404 page. Leave out both it and the `/404` route if you have no `not-found.html`.
+- `root` is the URL prefix when the site lives in a sub-folder. See [Build & Deploy](/docs/core/build-and-deploy#a-sub-folder-needs-the-router-too).
 
 :::note
-Components are authored as `.html` files but compiled to `.js` modules, so your imports
-reference the compiled name — `src/page.html` is imported as `./page.js`.
-:::
-
-:::note
-After each route's view mounts, the router dispatches a `viewLoaded` event on `window` — handy for analytics or scroll restoration: `window.addEventListener("viewLoaded", () => scrollTo(0, 0))`. It fires after the router has scrolled to a URL `#id`, so skip your own scroll when there is one: `if (!location.hash) scrollTo(0, 0)`.
+You write components as `.html`, but they're compiled to `.js`. So import `src/page.html` as `./page.js`.
 :::
